@@ -15,30 +15,41 @@ app.use((req, res, next) => {
 
 const userSocketMap = {};
 function getAllConnectedClients(roomId) {
-  // Map
-  return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map((socketId) => {
-    return {
-      socketId,
-      username: userSocketMap[socketId],
-    };
+  const clients = []; // Initialize an empty array for clients
+  const connectedSockets = io.sockets.adapter.rooms.get(roomId) || new Set(); // Get connected sockets or an empty Set
+
+  // Loop through each connected socket ID
+  connectedSockets.forEach((socketId) => {
+    clients.push({
+      // Add client info to the array
+      socketId: socketId,
+      username: userSocketMap[socketId], // Get username from userSocketMap
+    });
   });
+
+  return clients; // Return the array of connected clients
 }
+
+
 
 io.on("connection", (socket) => {
   console.log("socket connected", socket.id);
 
   socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
-    userSocketMap[socket.id] = username;
-    socket.join(roomId);
-    const clients = getAllConnectedClients(roomId);
-    clients.forEach(({ socketId }) => {
-      io.to(socketId).emit(ACTIONS.JOINED, {
+    userSocketMap[socket.id] = username; // Map the socket ID to the username
+    socket.join(roomId); // Join the specified room
+
+    const clients = getAllConnectedClients(roomId); // Get all connected clients in the room
+
+    clients.forEach((client) => {
+      io.to(client.socketId).emit(ACTIONS.JOINED, {
         clients,
         username,
         socketId: socket.id,
       });
     });
   });
+
 
   socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
     socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
